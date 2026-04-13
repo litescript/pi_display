@@ -35,6 +35,10 @@ SYSTEM_HEIGHT = 24
 SAIRA = "assets/fonts/Saira-VariableFont_wdth,wght.ttf"
 SHARETECH = "assets/fonts/ShareTech-Regular.ttf"
 
+def load_icon(name: str):
+    path = f"assets/icons/weather/png/{name}.png"
+    icon = Image.open(path).convert("RGBA")
+    return icon
 
 def load_font(path: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     try:
@@ -131,7 +135,12 @@ def draw_top_rail(draw: ImageDraw.ImageDraw, fonts: dict[str, ImageFont.ImageFon
     draw.text((CONTENT_RIGHT - right_w, y1 + 2), right_text, font=fonts["small"], fill=FG)
 
 
-def draw_hero(draw: ImageDraw.ImageDraw, fonts: dict[str, ImageFont.ImageFont], data: dict[str, Any]) -> None:
+def draw_hero(
+    img: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    fonts: dict[str, ImageFont.ImageFont],
+    data: dict[str, Any],
+) -> None:
     x1 = CONTENT_LEFT + 36
     x2 = CONTENT_RIGHT - 36
     y1 = HERO_TOP
@@ -170,6 +179,9 @@ def draw_hero(draw: ImageDraw.ImageDraw, fonts: dict[str, ImageFont.ImageFont], 
     group_h = cond_h + 8 + hilo_h
     group_y = y1 + (HERO_HEIGHT - group_h) // 2 - 18
 
+    icon = load_icon("partly_cloudy")
+    img.paste(icon, (right_x - 52, group_y + 12), icon)
+
     draw.text((right_x, group_y), condition_text, font=fonts["cond"], fill=FG)
     draw.text((right_x, group_y + cond_h + 8), hilo_text, font=fonts["med"], fill=FG)
 
@@ -207,6 +219,7 @@ def draw_three_column_band(
 
         label_x = center_text_x(draw, label, fonts["small_bold"], cx1, cx2)
         value_x = center_text_x(draw, value, fonts["med"], cx1, cx2)
+        value_x += 4
 
         draw.text((label_x, y_rule + 10), label, font=fonts["small_bold"], fill=FG)
         draw.text((value_x, y_rule + 30), value, font=fonts["med"], fill=FG)
@@ -279,7 +292,7 @@ def main() -> None:
     draw = ImageDraw.Draw(img)
 
     draw_top_rail(draw, fonts, data)
-    draw_hero(draw, fonts, data)
+    draw_hero(img, draw, fonts, data)
     draw_today_band(draw, fonts, data)
     draw_forecast(draw, fonts, data)
     draw_system(draw, fonts, data)
