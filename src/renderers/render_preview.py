@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from src.data_sources.weather_data import get_live_data
 from pathlib import Path
 from typing import Any
 
@@ -47,32 +47,6 @@ def load_font(path: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageF
     except OSError:
         pass
     return ImageFont.load_default()
-
-def get_mock_data() -> dict[str, Any]:
-    now = datetime.now()
-    return {
-        "node": "KITCHEN-BOX",
-        "wifi": "OK",
-        "ha": "OK",
-        "updated": now.strftime("%H:%M"),
-        "refresh_in": "18m",
-        "current_temp": 72,
-        "condition": "PARTLY CLOUDY",
-        "high": 78,
-        "low": 61,
-        "today": {
-            "am": {"label": "AM", "temp": 65},
-            "pm": {"label": "PM", "temp": 75},
-            "eve": {"label": "EVE", "temp": 68},
-        },
-        "forecast": [
-            {"day": "MON", "temp": 74},
-            {"day": "TUE", "temp": 70},
-            {"day": "WED", "temp": 77},
-        ],
-        "uptime": "02:14",
-        "ip": "192.168.1.56",
-    }
 
 
 def text_size(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> tuple[int, int]:
@@ -286,7 +260,7 @@ def main() -> None:
         "micro": load_font(SHARETECH, 12),
     }
 
-    data = get_mock_data()
+    data = get_live_data()
 
     img = Image.new("RGB", (WIDTH, HEIGHT), BG)
     draw = ImageDraw.Draw(img)
