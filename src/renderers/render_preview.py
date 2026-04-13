@@ -115,7 +115,7 @@ def draw_top_rail(draw: ImageDraw.ImageDraw, fonts: dict[str, ImageFont.ImageFon
     y2 = y1 + TOP_RAIL_H
 
     draw.line((CONTENT_LEFT, y2, CONTENT_RIGHT, y2), fill=FG, width=2)
-    draw.line((CONTENT_LEFT, y1 + 8, CONTENT_RIGHT, y1 + 8), fill=GRID, width=1)
+    draw.line((CONTENT_LEFT, y1 - 4, CONTENT_RIGHT, y1 - 4), fill=GRID, width=1)
 
     left_text = data["node"]
     right_text = (
@@ -125,10 +125,10 @@ def draw_top_rail(draw: ImageDraw.ImageDraw, fonts: dict[str, ImageFont.ImageFon
         f"REFRESH IN {data['refresh_in']}"
     )
 
-    draw.text((CONTENT_LEFT, y1 + 12), left_text, font=fonts["small_bold"], fill=FG)
+    draw.text((CONTENT_LEFT, y1 + 2), left_text, font=fonts["small_bold"], fill=FG)
 
     right_w, _ = text_size(draw, right_text, fonts["small"])
-    draw.text((CONTENT_RIGHT - right_w, y1 + 12), right_text, font=fonts["small"], fill=FG)
+    draw.text((CONTENT_RIGHT - right_w, y1 + 2), right_text, font=fonts["small"], fill=FG)
 
 
 def draw_hero(draw: ImageDraw.ImageDraw, fonts: dict[str, ImageFont.ImageFont], data: dict[str, Any]) -> None:
@@ -142,10 +142,10 @@ def draw_hero(draw: ImageDraw.ImageDraw, fonts: dict[str, ImageFont.ImageFont], 
     draw.line((x1 + 18, y1 + 18, x2 - 18, y1 + 18), fill=GRID, width=1)
     draw.line((x1 + 18, y2 - 18, x2 - 18, y2 - 18), fill=GRID, width=1)
 
-    draw.text((x1 + 10, y1 - 18), "PRIMARY WX PANEL", font=fonts["micro"], fill=FG)
+    draw.text((x1 + 10, y1 - 24), "PRIMARY WX PANEL", font=fonts["micro"], fill=FG)
     env_text = "ENV-01"
     env_w, _ = text_size(draw, env_text, fonts["micro"])
-    draw.text((x2 - env_w, y1 - 18), env_text, font=fonts["micro"], fill=FG)
+    draw.text((x2 - env_w, y1 - 24), env_text, font=fonts["micro"], fill=FG)
     draw.text((x1 + 12, y2 - 14), "LOCAL FORECAST MODEL", font=fonts["micro"], fill=FG)
 
     temp_text = f"{data['current_temp']}°"
@@ -158,12 +158,12 @@ def draw_hero(draw: ImageDraw.ImageDraw, fonts: dict[str, ImageFont.ImageFont], 
     left_x2 = x1 + int(hero_w * 0.42)
     right_x = x1 + int(hero_w * 0.52)
 
-# Left: big temp
+    # Left: big temp
     temp_x = left_x1 + 18
     temp_y = y1 - 32
     draw.text((temp_x, temp_y), temp_text, font=fonts["hero"], fill=FG)
 
-# Right: treat condition + hi/lo as one grouped block
+    # Right: treat condition + hi/lo as one grouped block
     cond_w, cond_h = text_size(draw, condition_text, fonts["cond"])
     hilo_w, hilo_h = text_size(draw, hilo_text, fonts["med"])
 
