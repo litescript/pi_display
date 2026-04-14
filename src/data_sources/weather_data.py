@@ -28,9 +28,10 @@ def get_live_data() -> dict[str, Any]:
     hourly = _extract_forecast_list(hourly_payload)
 
     attrs = state.get("attributes", {})
+    raw_condition = state.get("state")
 
     current_temp = _round_or_none(attrs.get("temperature"))
-    current_condition = ha_condition_to_label(state.get("state"))
+    current_condition = ha_condition_to_label(raw_condition)
 
     today = daily[0] if len(daily) > 0 else {}
     tomorrow = daily[1] if len(daily) > 1 else {}
@@ -50,8 +51,10 @@ def get_live_data() -> dict[str, Any]:
         "ha": "OK",
         "updated": datetime.now().strftime("%H:%M"),
         "refresh_in": "30m",
-        "current_temp": current_temp if current_temp is not None else today_high or 0,
+        "current_temp": current_temp if current_temp is not None else (today_high or 0),
         "condition": current_condition,
+        "condition_raw": raw_condition,
+        "condition_icon": ha_condition_to_icon(raw_condition),
         "high": today_high if today_high is not None else 0,
         "low": today_low if today_low is not None else 0,
         "today": {
@@ -141,9 +144,12 @@ def _extract_forecast_list(payload: Any) -> list[dict[str, Any]]:
     )
 
 
-def _pick_hourly_temp(hourly, target_hour):
-    best_item = None
-    best_distance = None
+def _pick_hourly_temp(hourly: list[dict[str, Any]], target_hour: int) -> int | None:
+    if not hourly:
+        return None
+
+    best_item: dict[str, Any] | None = None
+    best_distance: int | None = None
 
     for item in hourly:
         dt = item.get("datetime")
@@ -152,15 +158,11 @@ def _pick_hourly_temp(hourly, target_hour):
             continue
 
         try:
-            d = datetime.fromisoformat(dt)
-            if d.tzinfo is not None:
-                d = d.astimezone()
-            hour = d.hour
+            hour = datetime.fromisoformat(dt).astimezone().hour
         except ValueError:
             continue
 
         distance = abs(hour - target_hour)
-
         if best_distance is None or distance < best_distance:
             best_distance = distance
             best_item = item
@@ -170,17 +172,11 @@ def _pick_hourly_temp(hourly, target_hour):
 
     return _round_or_none(best_item.get("temperature"))
 
+
 def forecast_day_label(dt: str | None) -> str:
     if not dt:
         return "---"
-
-    d = datetime.fromisoformat(dt)
-
-    # Convert to local time if timezone-aware
-    if d.tzinfo is not None:
-        d = d.astimezone()
-
-    return d.strftime("%a").upper()
+    return datetime.fromisoformat(dt).astimezone().strftime("%a").upper()
 
 
 def midpoint(high: int | None, low: int | None) -> int:
@@ -227,6 +223,27 @@ def ha_condition_to_label(condition: str | None) -> str:
     return mapping.get(condition, condition.replace("-", " ").upper())
 
 
+def ha_condition_to_icon(condition: str | None) -> str:
+    mapping = {
+        "clear-night": "clear_moon",
+        "cloudy": "cloudy",
+        "fog": "cloudy",
+        "hail": "storm",
+        "lightning": "storm",
+        "lightning-rainy": "storm",
+        "partlycloudy": "partly_cloudy",
+        "pouring": "rain",
+        "rainy": "rain",
+        "snowy": "cloudy",
+        "snowy-rainy": "rain",
+        "sunny": "sunny",
+        "windy": "cloudy",
+        "windy-variant": "cloud_moon",
+        "exceptional": "storm",
+    }
+    return mapping.get(condition or "", "cloudy")
+
+
 def get_mock_data() -> dict[str, Any]:
     now = datetime.now()
     return {
@@ -237,6 +254,8 @@ def get_mock_data() -> dict[str, Any]:
         "refresh_in": "30m",
         "current_temp": 72,
         "condition": "PARTLY CLOUDY",
+        "condition_raw": "partlycloudy",
+        "condition_icon": "partly_cloudy",
         "high": 78,
         "low": 61,
         "today": {
@@ -252,3 +271,4 @@ def get_mock_data() -> dict[str, Any]:
         "uptime": "02:14",
         "ip": "192.168.1.56",
     }
+

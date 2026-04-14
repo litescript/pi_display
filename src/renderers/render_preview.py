@@ -36,9 +36,10 @@ SAIRA = "assets/fonts/Saira-VariableFont_wdth,wght.ttf"
 SHARETECH = "assets/fonts/ShareTech-Regular.ttf"
 
 def load_icon(name: str):
-    path = f"assets/icons/weather/png/{name}.png"
-    icon = Image.open(path).convert("RGBA")
-    return icon
+    path = Path(f"assets/icons/weather/png/{name}.png")
+    if not path.exists():
+        path = Path("assets/icons/weather/png/cloudy.png")
+    return Image.open(path).convert("RGBA")
 
 def load_font(path: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     try:
@@ -153,7 +154,7 @@ def draw_hero(
     group_h = cond_h + 8 + hilo_h
     group_y = y1 + (HERO_HEIGHT - group_h) // 2 - 18
 
-    icon = load_icon("partly_cloudy")
+    icon = load_icon(data.get("condition_icon", "cloudy"))
     img.paste(icon, (right_x - 52, group_y + 12), icon)
 
     draw.text((right_x, group_y), condition_text, font=fonts["cond"], fill=FG)
