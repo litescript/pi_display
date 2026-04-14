@@ -13,6 +13,7 @@ STATE_DIR="$PROJECT_DIR/.state"
 HASH_FILE="$STATE_DIR/preview.sha256"
 
 cd "$PROJECT_DIR"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting run (epaper=$DISPLAY_EPAPER force=$FORCE_DISPLAY)"
 
 for arg in "$@"; do
   case "$arg" in
@@ -37,12 +38,13 @@ EOF
 fi
 
 if [[ ! -x "$VENV_PY" ]]; then
-  echo "Error: virtualenv python not found at $VENV_PY"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error: virtualenv python not found at $VENV_PY"
   exit 1
 fi
 
 mkdir -p "$STATE_DIR"
 
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Rendering preview..."
 "$VENV_PY" -m src.renderers.render_preview
 
 if [[ ! -f "$PREVIEW_PATH" ]]; then
@@ -59,7 +61,7 @@ if [[ "$DISPLAY_EPAPER" -eq 1 ]]; then
   fi
 
   if [[ "$FORCE_DISPLAY" -eq 0 && "$NEW_HASH" == "$OLD_HASH" ]]; then
-    echo "Preview unchanged; skipping e-paper refresh."
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Preview unchanged; skipping e-paper refresh."
     exit 0
   fi
 
@@ -69,7 +71,7 @@ if [[ "$DISPLAY_EPAPER" -eq 1 ]]; then
     "$VENV_PY" display_preview.py
 
   echo "$NEW_HASH" > "$HASH_FILE"
-  echo "Display updated."
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Display updated."
 else
   xdg-open "$PREVIEW_PATH"
 fi
