@@ -21,21 +21,28 @@ HEADERS = {
 
 def get_live_data() -> dict[str, Any]:
     state = _get_current_state()
-    forecast_payload = _get_daily_forecast()
-    forecast_list = _extract_forecast_list(forecast_payload)
+    daily_payload = _get_forecast("daily")
+    hourly_payload = _get_forecast("hourly")
+
+    daily = _extract_forecast_list(daily_payload)
+    hourly = _extract_forecast_list(hourly_payload)
 
     attrs = state.get("attributes", {})
 
     current_temp = _round_or_none(attrs.get("temperature"))
     current_condition = ha_condition_to_label(state.get("state"))
 
-    today = forecast_list[0] if len(forecast_list) > 0 else {}
-    tomorrow = forecast_list[1] if len(forecast_list) > 1 else {}
-    day_after = forecast_list[2] if len(forecast_list) > 2 else {}
-    third_day = forecast_list[3] if len(forecast_list) > 3 else {}
+    today = daily[0] if len(daily) > 0 else {}
+    tomorrow = daily[1] if len(daily) > 1 else {}
+    day_after = daily[2] if len(daily) > 2 else {}
+    third_day = daily[3] if len(daily) > 3 else {}
 
     today_high = _round_or_none(today.get("temperature"))
     today_low = _round_or_none(today.get("templow"))
+
+    am_temp = _pick_hourly_temp(hourly, target_hour=9)
+    pm_temp = _pick_hourly_temp(hourly, target_hour=15)
+    eve_temp = _pick_hourly_temp(hourly, target_hour=20)
 
     return {
         "node": "KITCHEN-BOX",
@@ -50,15 +57,15 @@ def get_live_data() -> dict[str, Any]:
         "today": {
             "am": {
                 "label": "AM",
-                "temp": today_low if today_low is not None else 0,
+                "temp": am_temp if am_temp is not None else (today_low if today_low is not None else 0),
             },
             "pm": {
                 "label": "PM",
-                "temp": today_high if today_high is not None else 0,
+                "temp": pm_temp if pm_temp is not None else (today_high if today_high is not None else 0),
             },
             "eve": {
                 "label": "EVE",
-                "temp": midpoint(today_high, today_low),
+                "temp": eve_temp if eve_temp is not None else midpoint(today_high, today_low),
             },
         },
         "forecast": [
@@ -90,13 +97,13 @@ def _get_current_state() -> dict[str, Any]:
     return response.json()
 
 
-def _get_daily_forecast() -> dict[str, Any]:
+def _get_forecast(forecast_type: str) -> Any:
     response = requests.post(
         f"{HA_URL}/api/services/weather/get_forecasts?return_response",
         headers=HEADERS,
         json={
             "entity_id": HA_WEATHER_ENTITY,
-            "type": "daily",
+            "type": forecast_type,
         },
         timeout=15,
     )
@@ -105,15 +112,12 @@ def _get_daily_forecast() -> dict[str, Any]:
 
 
 def _extract_forecast_list(payload: Any) -> list[dict[str, Any]]:
-    # Expected shape:
-    # {"weather.forecast_home": {"forecast": [...]}}
     if isinstance(payload, dict) and HA_WEATHER_ENTITY in payload:
         entity_block = payload[HA_WEATHER_ENTITY]
         forecast = entity_block.get("forecast", [])
         if isinstance(forecast, list):
             return forecast
 
-    # Some HA/API paths may wrap the response data
     if isinstance(payload, dict) and "service_response" in payload:
         sr = payload["service_response"]
         if isinstance(sr, dict) and HA_WEATHER_ENTITY in sr:
@@ -122,7 +126,6 @@ def _extract_forecast_list(payload: Any) -> list[dict[str, Any]]:
             if isinstance(forecast, list):
                 return forecast
 
-    # Some callers may return a one-item list containing the mapping
     if isinstance(payload, list) and payload:
         first = payload[0]
         if isinstance(first, dict) and HA_WEATHER_ENTITY in first:
@@ -138,10 +141,46 @@ def _extract_forecast_list(payload: Any) -> list[dict[str, Any]]:
     )
 
 
+def _pick_hourly_temp(hourly, target_hour):
+    best_item = None
+    best_distance = None
+
+    for item in hourly:
+        dt = item.get("datetime")
+        temp = item.get("temperature")
+        if dt is None or temp is None:
+            continue
+
+        try:
+            d = datetime.fromisoformat(dt)
+            if d.tzinfo is not None:
+                d = d.astimezone()
+            hour = d.hour
+        except ValueError:
+            continue
+
+        distance = abs(hour - target_hour)
+
+        if best_distance is None or distance < best_distance:
+            best_distance = distance
+            best_item = item
+
+    if best_item is None:
+        return None
+
+    return _round_or_none(best_item.get("temperature"))
+
 def forecast_day_label(dt: str | None) -> str:
     if not dt:
         return "---"
-    return datetime.fromisoformat(dt).strftime("%a").upper()
+
+    d = datetime.fromisoformat(dt)
+
+    # Convert to local time if timezone-aware
+    if d.tzinfo is not None:
+        d = d.astimezone()
+
+    return d.strftime("%a").upper()
 
 
 def midpoint(high: int | None, low: int | None) -> int:
@@ -187,3 +226,29 @@ def ha_condition_to_label(condition: str | None) -> str:
         return "UNKNOWN"
     return mapping.get(condition, condition.replace("-", " ").upper())
 
+
+def get_mock_data() -> dict[str, Any]:
+    now = datetime.now()
+    return {
+        "node": "KITCHEN-BOX",
+        "wifi": "OK",
+        "ha": "OK",
+        "updated": now.strftime("%H:%M"),
+        "refresh_in": "30m",
+        "current_temp": 72,
+        "condition": "PARTLY CLOUDY",
+        "high": 78,
+        "low": 61,
+        "today": {
+            "am": {"label": "AM", "temp": 65},
+            "pm": {"label": "PM", "temp": 75},
+            "eve": {"label": "EVE", "temp": 68},
+        },
+        "forecast": [
+            {"day": "MON", "temp": 74},
+            {"day": "TUE", "temp": 70},
+            {"day": "WED", "temp": 77},
+        ],
+        "uptime": "02:14",
+        "ip": "192.168.1.56",
+    }
