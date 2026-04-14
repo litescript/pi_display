@@ -13,7 +13,6 @@ STATE_DIR="$PROJECT_DIR/.state"
 HASH_FILE="$STATE_DIR/preview.sha256"
 
 cd "$PROJECT_DIR"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting run (epaper=$DISPLAY_EPAPER force=$FORCE_DISPLAY)"
 
 for arg in "$@"; do
   case "$arg" in
@@ -26,6 +25,8 @@ for arg in "$@"; do
       ;;
   esac
 done
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting run (epaper=$DISPLAY_EPAPER force=$FORCE_DISPLAY)"
 
 if [[ "$SHOW_HELP" -eq 1 ]]; then
   cat <<EOF
