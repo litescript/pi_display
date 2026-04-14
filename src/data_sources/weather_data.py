@@ -1,4 +1,4 @@
-from __future__ import annotations
+<Del>from __future__ import annotations
 
 import os
 from datetime import datetime
@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 HA_URL = os.environ["HA_URL"].rstrip("/")
-HA_TOKEN = os.environ["HA_TOKEN"]
-HA_WEATHER_ENTITY = os.environ.get("HA_WEATHER_ENTITY", "weather.forecast_home")
+HA_TOKEN = os.environ["HA_TOKEN"].strip()
+HA_WEATHER_ENTITY = os.environ.get("HA_WEATHER_ENTITY", "weather.forecast_home").strip()
 
 HEADERS = {
     "Authorization": f"Bearer {HA_TOKEN}",
@@ -22,8 +22,8 @@ HEADERS = {
 def get_live_data() -> dict[str, Any]:
     state = _get_current_state()
     forecast_payload = _get_daily_forecast()
+    forecast_list = _extract_forecast_list(forecast_payload)
 
-    forecast_list = forecast_payload[HA_WEATHER_ENTITY]["forecast"]
     attrs = state.get("attributes", {})
 
     current_temp = _round_or_none(attrs.get("temperature"))
@@ -104,6 +104,40 @@ def _get_daily_forecast() -> dict[str, Any]:
     return response.json()
 
 
+def _extract_forecast_list(payload: Any) -> list[dict[str, Any]]:
+    # Expected shape:
+    # {"weather.forecast_home": {"forecast": [...]}}
+    if isinstance(payload, dict) and HA_WEATHER_ENTITY in payload:
+        entity_block = payload[HA_WEATHER_ENTITY]
+        forecast = entity_block.get("forecast", [])
+        if isinstance(forecast, list):
+            return forecast
+
+    # Some HA/API paths may wrap the response data
+    if isinstance(payload, dict) and "service_response" in payload:
+        sr = payload["service_response"]
+        if isinstance(sr, dict) and HA_WEATHER_ENTITY in sr:
+            entity_block = sr[HA_WEATHER_ENTITY]
+            forecast = entity_block.get("forecast", [])
+            if isinstance(forecast, list):
+                return forecast
+
+    # Some callers may return a one-item list containing the mapping
+    if isinstance(payload, list) and payload:
+        first = payload[0]
+        if isinstance(first, dict) and HA_WEATHER_ENTITY in first:
+            entity_block = first[HA_WEATHER_ENTITY]
+            forecast = entity_block.get("forecast", [])
+            if isinstance(forecast, list):
+                return forecast
+
+    raise KeyError(
+        f"Could not find forecast data for {HA_WEATHER_ENTITY!r}. "
+        f"Top-level payload type={type(payload).__name__}, "
+        f"keys={list(payload.keys()) if isinstance(payload, dict) else 'n/a'}"
+    )
+
+
 def forecast_day_label(dt: str | None) -> str:
     if not dt:
         return "---"
@@ -153,29 +187,3 @@ def ha_condition_to_label(condition: str | None) -> str:
         return "UNKNOWN"
     return mapping.get(condition, condition.replace("-", " ").upper())
 
-
-def get_mock_data() -> dict[str, Any]:
-    now = datetime.now()
-    return {
-        "node": "KITCHEN-BOX",
-        "wifi": "OK",
-        "ha": "OK",
-        "updated": now.strftime("%H:%M"),
-        "refresh_in": "30m",
-        "current_temp": 72,
-        "condition": "PARTLY CLOUDY",
-        "high": 78,
-        "low": 61,
-        "today": {
-            "am": {"label": "AM", "temp": 65},
-            "pm": {"label": "PM", "temp": 75},
-            "eve": {"label": "EVE", "temp": 68},
-        },
-        "forecast": [
-            {"day": "MON", "temp": 74},
-            {"day": "TUE", "temp": 70},
-            {"day": "WED", "temp": 77},
-        ],
-        "uptime": "02:14",
-        "ip": "192.168.1.56",
-    }
