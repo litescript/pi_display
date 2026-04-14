@@ -52,6 +52,7 @@ mkdir -p "$STATE_DIR"
 
 source .venv/bin/activate
 
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting update"
 python -m src.renderers.render_preview
 
 if [[ ! -f "$PREVIEW_PATH" ]]; then

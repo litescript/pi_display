@@ -1,80 +1,158 @@
 from __future__ import annotations
 
-import requests
-
+import os
 from datetime import datetime
 from typing import Any
 
-# Lat/Lon for Home
-LAT = 39.86679
-LON = -85.98334
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
+HA_URL = os.environ["HA_URL"].rstrip("/")
+HA_TOKEN = os.environ["HA_TOKEN"]
+HA_WEATHER_ENTITY = os.environ.get("HA_WEATHER_ENTITY", "weather.forecast_home")
+
+HEADERS = {
+    "Authorization": f"Bearer {HA_TOKEN}",
+    "Content-Type": "application/json",
+}
 
 
 def get_live_data() -> dict[str, Any]:
-    url = (
-        "https://api.open-meteo.com/v1/forecast"
-        f"?latitude={LAT}&longitude={LON}"
-        "&current=temperature_2m,weather_code"
-        "&daily=weather_code,temperature_2m_max,temperature_2m_min"
-        "&temperature_unit=fahrenheit"
-        "&wind_speed_unit=mph"
-        "&precipitation_unit=inch"
-        "&timezone=auto"
-    )
-    r = requests.get(url, timeout=10)
-    r.raise_for_status()
-    payload = r.json()
+    state = _get_current_state()
+    forecast_payload = _get_daily_forecast()
 
-    current = payload["current"]
-    daily = payload["daily"]
+    forecast_list = forecast_payload[HA_WEATHER_ENTITY]["forecast"]
+    attrs = state.get("attributes", {})
 
-    days = daily["time"]
-    highs = daily["temperature_2m_max"]
-    lows = daily["temperature_2m_min"]
-    codes = daily["weather_code"]
+    current_temp = _round_or_none(attrs.get("temperature"))
+    current_condition = ha_condition_to_label(state.get("state"))
+
+    today = forecast_list[0] if len(forecast_list) > 0 else {}
+    tomorrow = forecast_list[1] if len(forecast_list) > 1 else {}
+    day_after = forecast_list[2] if len(forecast_list) > 2 else {}
+    third_day = forecast_list[3] if len(forecast_list) > 3 else {}
+
+    today_high = _round_or_none(today.get("temperature"))
+    today_low = _round_or_none(today.get("templow"))
 
     return {
         "node": "KITCHEN-BOX",
         "wifi": "OK",
         "ha": "OK",
         "updated": datetime.now().strftime("%H:%M"),
-        "refresh_in": "18m",
-        "current_temp": round(current["temperature_2m"]),
-        "condition": weather_code_to_label(current["weather_code"]),
-        "high": round(highs[0]),
-        "low": round(lows[0]),
+        "refresh_in": "30m",
+        "current_temp": current_temp if current_temp is not None else today_high or 0,
+        "condition": current_condition,
+        "high": today_high if today_high is not None else 0,
+        "low": today_low if today_low is not None else 0,
         "today": {
-            "am": {"label": "AM", "temp": round(lows[0])},
-            "pm": {"label": "PM", "temp": round(highs[0])},
-            "eve": {"label": "EVE", "temp": round((highs[0] + lows[0]) / 2)},
+            "am": {
+                "label": "AM",
+                "temp": today_low if today_low is not None else 0,
+            },
+            "pm": {
+                "label": "PM",
+                "temp": today_high if today_high is not None else 0,
+            },
+            "eve": {
+                "label": "EVE",
+                "temp": midpoint(today_high, today_low),
+            },
         },
         "forecast": [
-            {"day": day_label(days[1]), "temp": round(highs[1])},
-            {"day": day_label(days[2]), "temp": round(highs[2])},
-            {"day": day_label(days[3]), "temp": round(highs[3])},
+            {
+                "day": forecast_day_label(tomorrow.get("datetime")),
+                "temp": _round_or_zero(tomorrow.get("temperature")),
+            },
+            {
+                "day": forecast_day_label(day_after.get("datetime")),
+                "temp": _round_or_zero(day_after.get("temperature")),
+            },
+            {
+                "day": forecast_day_label(third_day.get("datetime")),
+                "temp": _round_or_zero(third_day.get("temperature")),
+            },
         ],
         "uptime": "02:14",
         "ip": "192.168.1.56",
     }
 
 
-def day_label(iso_date: str) -> str:
-    from datetime import datetime
-    return datetime.fromisoformat(iso_date).strftime("%a").upper()
+def _get_current_state() -> dict[str, Any]:
+    response = requests.get(
+        f"{HA_URL}/api/states/{HA_WEATHER_ENTITY}",
+        headers=HEADERS,
+        timeout=10,
+    )
+    response.raise_for_status()
+    return response.json()
 
 
-def weather_code_to_label(code: int) -> str:
-    if code == 0:
-        return "CLEAR"
-    if code in (1, 2):
-        return "PARTLY CLOUDY"
-    if code == 3:
-        return "CLOUDY"
-    if code in (51, 53, 55, 61, 63, 65, 80, 81, 82):
-        return "RAIN"
-    if code in (95, 96, 99):
-        return "STORM"
-    return "UNKNOWN"
+def _get_daily_forecast() -> dict[str, Any]:
+    response = requests.post(
+        f"{HA_URL}/api/services/weather/get_forecasts?return_response",
+        headers=HEADERS,
+        json={
+            "entity_id": HA_WEATHER_ENTITY,
+            "type": "daily",
+        },
+        timeout=15,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def forecast_day_label(dt: str | None) -> str:
+    if not dt:
+        return "---"
+    return datetime.fromisoformat(dt).strftime("%a").upper()
+
+
+def midpoint(high: int | None, low: int | None) -> int:
+    if high is None and low is None:
+        return 0
+    if high is None:
+        return low or 0
+    if low is None:
+        return high
+    return round((high + low) / 2)
+
+
+def _round_or_none(value: Any) -> int | None:
+    if value is None:
+        return None
+    return round(float(value))
+
+
+def _round_or_zero(value: Any) -> int:
+    rounded = _round_or_none(value)
+    return rounded if rounded is not None else 0
+
+
+def ha_condition_to_label(condition: str | None) -> str:
+    mapping = {
+        "clear-night": "CLEAR",
+        "cloudy": "CLOUDY",
+        "fog": "FOG",
+        "hail": "HAIL",
+        "lightning": "STORM",
+        "lightning-rainy": "STORM",
+        "partlycloudy": "PARTLY CLOUDY",
+        "pouring": "RAIN",
+        "rainy": "RAIN",
+        "snowy": "SNOW",
+        "snowy-rainy": "WINTRY MIX",
+        "sunny": "CLEAR",
+        "windy": "WINDY",
+        "windy-variant": "WINDY",
+        "exceptional": "ALERT",
+    }
+    if not condition:
+        return "UNKNOWN"
+    return mapping.get(condition, condition.replace("-", " ").upper())
+
 
 def get_mock_data() -> dict[str, Any]:
     now = datetime.now()
@@ -83,7 +161,7 @@ def get_mock_data() -> dict[str, Any]:
         "wifi": "OK",
         "ha": "OK",
         "updated": now.strftime("%H:%M"),
-        "refresh_in": "18m",
+        "refresh_in": "30m",
         "current_temp": 72,
         "condition": "PARTLY CLOUDY",
         "high": 78,
@@ -101,4 +179,3 @@ def get_mock_data() -> dict[str, Any]:
         "uptime": "02:14",
         "ip": "192.168.1.56",
     }
-
