@@ -76,17 +76,22 @@ def draw_corner_brackets(
     length: int = 18,
     width: int = 2,
 ) -> None:
+    gap = 10
+    # Top left corner
     draw.line((x1, y1, x1 + length, y1), fill=color, width=width)
     draw.line((x1, y1, x1, y1 + length), fill=color, width=width)
 
+    # Top right corner
     draw.line((x2 - length, y1, x2, y1), fill=color, width=width)
     draw.line((x2, y1, x2, y1 + length), fill=color, width=width)
 
-    draw.line((x1, y2, x1 + length, y2), fill=color, width=width)
-    draw.line((x1, y2 - length, x1, y2), fill=color, width=width)
+    # Bottom left corner
+    draw.line((x1, y2 + gap, x1 + length, y2 + gap), fill=color, width=width)
+    draw.line((x1, y2 - length + gap, x1, y2 + gap), fill=color, width=width)
 
-    draw.line((x2 - length, y2, x2, y2), fill=color, width=width)
-    draw.line((x2, y2 - length, x2, y2), fill=color, width=width)
+    # Bottom right corner
+    draw.line((x2 - length, y2 + gap, x2, y2 + gap), fill=color, width=width)
+    draw.line((x2, y2 - length + gap, x2, y2 + gap), fill=color, width=width)
 
 
 def draw_top_rail(draw: ImageDraw.ImageDraw, fonts: dict[str, ImageFont.ImageFont], data: dict[str, Any]) -> None:

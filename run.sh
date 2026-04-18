@@ -5,19 +5,17 @@ SHOW_HELP=0
 DISPLAY_EPAPER=0
 FORCE_DISPLAY=0
 
-PROJECT_DIR="/home/litescript/code/pi_display"
-VENV_PY="$PROJECT_DIR/.venv/bin/python"
-WAVESHARE_LIB="${WAVESHARE_LIB:-/home/litescript/e-Paper/RaspberryPi_JetsonNano/python/lib}"
-PREVIEW_PATH="$PROJECT_DIR/output/preview.png"
-STATE_DIR="$PROJECT_DIR/.state"
-HASH_FILE="$STATE_DIR/preview.sha256"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$SCRIPT_DIR"
 
-cd "$PROJECT_DIR"
+# Pi-only default; harmless on PC unless --epaper is used
+WAVESHARE_LIB="${WAVESHARE_LIB:-/home/litescript/e-Paper/RaspberryPi_JetsonNano/python/lib}"
 
 for arg in "$@"; do
   case "$arg" in
     --epaper) DISPLAY_EPAPER=1 ;;
     --force) FORCE_DISPLAY=1 ;;
+    --pc) PROJECT_DIR="/home/peter/code/pi_display/eink_dev" ;;
     -h|--help) SHOW_HELP=1 ;;
     *)
       echo "Unknown argument: $arg"
@@ -25,6 +23,13 @@ for arg in "$@"; do
       ;;
   esac
 done
+
+VENV_PY="$PROJECT_DIR/.venv/bin/python"
+PREVIEW_PATH="$PROJECT_DIR/output/preview.png"
+STATE_DIR="$PROJECT_DIR/.state"
+HASH_FILE="$STATE_DIR/preview.sha256"
+
+cd "$PROJECT_DIR"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting run (epaper=$DISPLAY_EPAPER force=$FORCE_DISPLAY)"
 
@@ -34,6 +39,7 @@ Usage:
   ./run.sh
   ./run.sh --epaper
   ./run.sh --epaper --force
+  ./run.sh --pc
 EOF
   exit 0
 fi
